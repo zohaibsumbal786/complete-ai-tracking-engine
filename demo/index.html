@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Tracking Engine</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    * { font-family: 'Inter', sans-serif; }
+    .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    .card-hover { transition: all 0.3s ease; }
+    .card-hover:hover { transform: translateY(-2px); box-shadow: 0 20px 40px rgba(0,0,0,0.12); }
+    .fade-in { animation: fadeIn 0.5s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .pulse-dot { animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .drag-card { cursor: grab; transition: all 0.2s ease; }
+    .drag-card:active { cursor: grabbing; transform: rotate(2deg) scale(1.02); }
+    .drag-card:hover { transform: translateY(-3px); box-shadow: 0 10px 30px rgba(0,0,0,0.15); }
+    .column-drop { min-height: 300px; transition: background 0.2s; }
+    .column-drop.drag-over { background: rgba(102,126,234,0.08); border: 2px dashed #667eea !important; border-radius: 12px; }
+    .confidence-bar { transition: width 1s ease-in-out; }
+    .nav-btn { transition: all 0.2s ease; position: relative; }
+    .nav-btn.active { background: #f3f0ff; color: #7c3aed; }
+    .loading-dots span { animation: loadDot 1.4s infinite; display:inline-block; width:6px; height:6px; background:#9333ea; border-radius:50%; margin:0 2px; }
+    .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes loadDot { 0%,80%,100%{transform:scale(0);opacity:0} 40%{transform:scale(1);opacity:1} }
+    .tag { display:inline-block; padding:2px 10px; border-radius:999px; font-size:11px; font-weight:600; letter-spacing:.3px; }
+    .toast { position:fixed; bottom:24px; right:24px; z-index:1000; animation: toastIn .3s ease; }
+    @keyframes toastIn { from{transform:translateY(20px);opacity:0} to{transform:translateY(0);opacity:1} }
+    ::-webkit-scrollbar { width:6px; }
+    ::-webkit-scrollbar-thumb { background:#c1c1c1; border-radius:3px; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+<div id="toast" class="toast hidden">
+  <div class="bg-gray-900 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-sm font-medium">
+    <span id="toastIcon">✅</span><span id="toastMsg">Done!</span>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header class="bg-white border-b border-gray-100 sticky top-0 z-40 shadow-sm">
+  <div class="max-w-7xl mx-auto px-6">
+    <div class="flex items-center justify-between h-16">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 gradient-bg rounded-xl flex items-center justify-center shadow-lg">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-gray-900">AI Tracking Engine</h1>
+          <p class="text-xs text-gray-400">Documentation Intelligence Platform</p>
+        </div>
+      </div>
+      <nav class="flex items-center gap-1">
+        <button onclick="showView('query')" id="nav-query" class="nav-btn active px-4 py-2 rounded-lg text-sm font-medium text-gray-700 flex items-center gap-2">💬 Query</button>
+        <button onclick="showView('dashboard')" id="nav-dashboard" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2">📋 Dashboard</button>
+        <button onclick="showView('analytics')" id="nav-analytics" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2">📊 Analytics</button>
+        <button onclick="showView('documents')" id="nav-documents" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2">📄 Documents</button>
+      </nav>
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 bg-green-50 px-3 py-1.5 rounded-full">
+          <div class="w-2 h-2 bg-green-500 rounded-full pulse-dot"></div>
+          <span class="text-xs font-medium text-green-700">Live Demo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-6 py-8">
+
+  <!-- QUERY VIEW -->
+  <div id="view-query" class="fade-in">
+    <div class="mb-6">
+      <h2 class="text-2xl font-bold text-gray-900">Ask a Question</h2>
+      <p class="text-gray-500 mt-1">Query your company documentation with AI-powered answers and confidence scores</p>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="lg:col-span-2 space-y-5">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 card-hover">
+          <label class="block text-sm font-semibold text-gray-700 mb-3">Your Question</label>
+          <textarea id="questionInput" rows="4" placeholder="e.g. What is the leave policy for employees?" class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent transition-all"></textarea>
+          <div class="flex items-center justify-between mt-3">
+            <div class="flex flex-wrap gap-2">
+              <button onclick="setQ('What are the standard working hours?')" class="text-xs bg-purple-50 text-purple-700 px-3 py-1.5 rounded-lg hover:bg-purple-100 transition-colors">Working hours?</button>
+              <button onclick="setQ('How many vacation days do I get?')" class="text-xs bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-colors">Vacation days?</button>
+              <button onclick="setQ('What is the expense reimbursement policy?')" class="text-xs bg-green-50 text-green-700 px-3 py-1.5 rounded-lg hover:bg-green-100 transition-colors">Expenses?</button>
+              <button onclick="setQ('How do I report a security incident?')" class="text-xs bg-red-50 text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-100 transition-colors">Security?</button>
+              <button onclick="setQ('What is the remote work policy?')" class="text-xs bg-yellow-50 text-yellow-700 px-3 py-1.5 rounded-lg hover:bg-yellow-100 transition-colors">Remote work?</button>
+            </div>
+            <button onclick="askQuestion()" id="askBtn" class="gradient-bg text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-all flex items-center gap-2 shadow-lg ml-4 flex-shrink-0">
+              ⚡ Ask AI
+            </button>
+          </div>
+        </div>
+
+        <!-- Answer Box -->
+        <div id="answerBox" class="hidden bg-white rounded-2xl shadow-sm border border-gray-100 p-6 fade-in">
+          <div id="loadingState" class="flex items-center gap-4 py-4">
+            <div class="w-10 h-10 gradient-bg rounded-xl flex items-center justify-center flex-shrink-0">
+              <svg class="w-5 h-5 text-white animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-gray-700">Searching documentation <span class="loading-dots"><span></span><span></span><span></span></span></p>
+              <p class="text-xs text-gray-400 mt-1">Generating AI response with confidence scoring...</p>
+            </div>
+          </div>
+          <div id="answerContent" class="hidden">
+            <div class="flex items-start justify-between mb-4">
+              <div class="flex items-center gap-2">
+                <div class="w-8 h-8 gradient-bg rounded-lg flex items-center justify-center">🤖</div>
+                <span class="font-semibold text-gray-900">AI Answer</span>
+              </div>
+              <div id="confidenceBadge" class="px-3 py-1.5 rounded-full text-sm font-bold"></div>
+            </div>
+            <p id="answerText" class="text-gray-700 leading-relaxed text-sm mb-5"></p>
+            <div class="mb-5">
+              <div class="flex justify-between text-xs text-gray-500 mb-1.5">
+                <span>Confidence Score</span>
+                <span id="confPercent" class="font-bold"></span>
+              </div>
+              <div class="bg-gray-100 rounded-full h-3 overflow-hidden">
+                <div id="confBar" class="h-full rounded-full confidence-bar" style="width:0%"></div>
+              </div>
+              <div class="flex justify-between text-xs text-gray-400 mt-1"><span>0%</span><span>50%</span><span>100%</span></div>
+            </div>
+            <div>
+              <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">📎 Sources</p>
+              <div id="sourcesList" class="space-y-2"></div>
+            </div>
+            <div id="lowConfWarn" class="hidden mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl flex gap-3">
+              <span class="text-xl">⚠️</span>
+              <div>
+                <p class="text-sm font-semibold text-amber-800">Low Confidence — Documentation Gap Detected</p>
+                <p class="text-xs text-amber-700 mt-1">This answer scored below 70%. A new SOP update card has been automatically created in the Dashboard.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sidebar -->
+      <div class="space-y-5">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+          <h3 class="font-semibold text-gray-900 mb-4">🕐 Recent Queries</h3>
+          <div id="recentList"><p class="text-xs text-gray-400 text-center py-4">No queries yet — ask a question!</p></div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+          <h3 class="font-semibold text-gray-900 mb-4">📊 Session Stats</h3>
+          <div class="space-y-3">
+            <div class="flex justify-between"><span class="text-xs text-gray-500">Questions Asked</span><span id="statQ" class="font-bold text-gray-900">0</span></div>
+            <div class="flex justify-between"><span class="text-xs text-gray-500">Avg Confidence</span><span id="statC" class="font-bold text-gray-900">—</span></div>
+            <div class="flex justify-between"><span class="text-xs text-gray-500">Low Confidence</span><span id="statL" class="font-bold text-red-500">0</span></div>
+          </div>
+        </div>
+        <div class="bg-gradient-to-br from-purple-600 to-indigo-600 rounded-2xl p-5 text-white">
+          <p class="font-semibold mb-1">💡 How It Works</p>
+          <p class="text-xs opacity-90 leading-relaxed">Your question is embedded as a vector, matched against document chunks using cosine similarity, then answered by an LLM with a confidence score.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DASHBOARD VIEW -->
+  <div id="view-dashboard" class="hidden fade-in">
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h2 class="text-2xl font-bold text-gray-900">SOP Updates Dashboard</h2>
+        <p class="text-gray-500 mt-1">Drag and drop cards between columns to update their status</p>
+      </div>
+      <button onclick="addNewCard()" class="gradient-bg text-white px-4 py-2 rounded-xl text-sm font-medium hover:opacity-90 transition flex items-center gap-2">+ Add Card</button>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5" id="kanban-board"></div>
+  </div>
+
+  <!-- ANALYTICS VIEW -->
+  <div id="view-analytics" class="hidden fade-in">
+    <div class="mb-6">
+      <h2 class="text-2xl font-bold text-gray-900">Analytics Dashboard</h2>
+      <p class="text-gray-500 mt-1">Question patterns, confidence trends, and documentation insights</p>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-5 mb-8">
+      <div class="bg-white rounded-2xl border border-gray-100 p-6 card-hover">
+        <div class="text-3xl mb-1">💬</div>
+        <p class="text-2xl font-bold text-gray-900">1,284</p>
+        <p class="text-sm text-gray-500">Total Queries</p>
+        <p class="text-xs text-green-600 mt-1 font-medium">+18% this week ↑</p>
+      </div>
+      <div class="bg-white rounded-2xl border border-gray-100 p-6 card-hover">
+        <div class="text-3xl mb-1">✅</div>
+        <p class="text-2xl font-bold text-gray-900">76.4%</p>
+        <p class="text-sm text-gray-500">Avg Confidence</p>
+        <p class="text-xs text-green-600 mt-1 font-medium">+5.2% this week ↑</p>
+      </div>
+      <div class="bg-white rounded-2xl border border-gray-100 p-6 card-hover">
+        <div class="text-3xl mb-1">⚠️</div>
+        <p class="text-2xl font-bold text-gray-900">142</p>
+        <p class="text-sm text-gray-500">Low Confidence</p>
+        <p class="text-xs text-red-600 mt-1 font-medium">-8 from last week</p>
+      </div>
+      <div class="bg-white rounded-2xl border border-gray-100 p-6 card-hover">
+        <div class="text-3xl mb-1">📋</div>
+        <p class="text-2xl font-bold text-gray-900">24</p>
+        <p class="text-sm text-gray-500">SOP Updates</p>
+        <p class="text-xs text-purple-600 mt-1 font-medium">+3 new this week</p>
+      </div>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <div class="bg-white rounded-2xl border border-gray-100 p-6">
+        <h3 class="font-semibold text-gray-900 mb-4">Weekly Query Volume</h3>
+        <canvas id="queryChart" height="200"></canvas>
+      </div>
+      <div class="bg-white rounded-2xl border border-gray-100 p-6">
+        <h3 class="font-semibold text-gray-900 mb-4">Confidence Score Trend</h3>
+        <canvas id="confChart" height="200"></canvas>
+      </div>
+    </div>
+    <div class="bg-white rounded-2xl border border-gray-100 p-6">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="font-semibold text-gray-900">Top Question Clusters This Week</h3>
+        <button onclick="showToast('Clustering 1,284 queries...','🔄')" class="gradient-bg text-white px-4 py-2 rounded-xl text-xs font-semibold">▶ Run Clustering</button>
+      </div>
+      <table class="w-full text-sm">
+        <thead><tr class="border-b border-gray-100 text-left">
+          <th class="py-3 px-3 text-xs text-gray-500 uppercase font-semibold">Topic</th>
+          <th class="py-3 px-3 text-xs text-gray-500 uppercase font-semibold">Questions</th>
+          <th class="py-3 px-3 text-xs text-gray-500 uppercase font-semibold">Avg Confidence</th>
+          <th class="py-3 px-3 text-xs text-gray-500 uppercase font-semibold">Priority</th>
+          <th class="py-3 px-3 text-xs text-gray-500 uppercase font-semibold">Action</th>
+        </tr></thead>
+        <tbody id="clusterTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- DOCUMENTS VIEW -->
+  <div id="view-documents" class="hidden fade-in">
+    <div class="mb-6">
+      <h2 class="text-2xl font-bold text-gray-900">Document Library</h2>
+      <p class="text-gray-500 mt-1">Upload and manage your company knowledge base</p>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="lg:col-span-2 space-y-5">
+        <div class="bg-white rounded-2xl border border-gray-100 p-6">
+          <h3 class="font-semibold text-gray-900 mb-4">Upload Document</h3>
+          <div id="dropZone" onclick="document.getElementById('fileInput').click()"
+            ondragover="event.preventDefault();this.classList.add('!border-purple-400','!bg-purple-50')"
+            ondragleave="this.classList.remove('!border-purple-400','!bg-purple-50')"
+            ondrop="handleDrop(event)"
+            class="border-2 border-dashed border-gray-200 rounded-xl p-12 text-center cursor-pointer hover:border-purple-400 hover:bg-purple-50 transition-all">
+            <div class="text-5xl mb-3">📂</div>
+            <p class="font-semibold text-gray-700">Drop files here or click to upload</p>
+            <p class="text-sm text-gray-400 mt-2">Supports PDF and Markdown (.md) files</p>
+            <input type="file" id="fileInput" class="hidden" accept=".pdf,.md" onchange="handleFileUpload(event)">
+          </div>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-100 p-6">
+          <h3 class="font-semibold text-gray-900 mb-4">Uploaded Documents <span id="docCount" class="text-sm font-normal text-gray-400"></span></h3>
+          <div id="docList" class="space-y-3"></div>
+        </div>
+      </div>
+      <div class="space-y-5">
+        <div class="bg-white rounded-2xl border border-gray-100 p-5">
+          <h3 class="font-semibold text-gray-900 mb-4">📊 Library Stats</h3>
+          <div class="mb-4">
+            <div class="flex justify-between text-xs text-gray-500 mb-1"><span>Storage Used</span><span>342 MB / 1 GB</span></div>
+            <div class="bg-gray-100 rounded-full h-2"><div class="gradient-bg h-full rounded-full" style="width:34%"></div></div>
+          </div>
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between"><span class="text-gray-500">Total Documents</span><span id="totalDocs" class="font-bold">4</span></div>
+            <div class="flex justify-between"><span class="text-gray-500">Total Chunks</span><span class="font-bold">1,284</span></div>
+            <div class="flex justify-between"><span class="text-gray-500">Avg Quality</span><span class="font-bold text-green-600">85.5%</span></div>
+          </div>
+        </div>
+        <div class="bg-gradient-to-br from-purple-600 to-indigo-600 rounded-2xl p-5 text-white">
+          <p class="font-semibold mb-2">💡 Tip</p>
+          <p class="text-xs opacity-90 leading-relaxed">Documents are split into 500-word chunks with 50-word overlap for optimal RAG retrieval. Better structured docs = higher confidence scores.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ===== STATE =====
+const S = {
+  queries: [], sessionQ: 0, totalConf: 0, lowConf: 0,
+  docs: [
+    { id:1, name:'Employee Handbook', type:'pdf', size:'2.4 MB', pages:48, chunks:384, date:'Jan 15, 2024', conf:84 },
+    { id:2, name:'IT Security Policy', type:'pdf', size:'1.1 MB', pages:22, chunks:176, date:'Jan 10, 2024', conf:79 },
+    { id:3, name:'Expense Policy', type:'md', size:'156 KB', pages:8, chunks:64, date:'Jan 5, 2024', conf:91 },
+    { id:4, name:'Onboarding SOP', type:'pdf', size:'3.2 MB', pages:60, chunks:480, date:'Dec 28, 2023', conf:88 },
+  ],
+  kanban: {
+    to_update: [
+      { id:1, title:'Leave Policy Documentation', desc:'15 questions about vacation, sick leave, and carryover with avg 61% confidence', priority:'high', questions:15, conf:61, assignee:'Sarah M.', tags:['HR'] },
+      { id:2, title:'Remote Work Guidelines', desc:'12 questions about setup requirements, VPN, and equipment for remote work', priority:'high', questions:12, conf:58, assignee:'—', tags:['IT'] },
+      { id:3, title:'Performance Review Process', desc:'8 questions about review timelines, scoring criteria, and feedback process', priority:'medium', questions:8, conf:67, assignee:'Tom K.', tags:['HR'] },
+    ],
+    in_progress: [
+      { id:4, title:'IT Security Procedures', desc:'Updating incident response, password policies, and phishing guidelines', priority:'high', questions:18, conf:63, assignee:'Alex R.', tags:['IT','Security'] },
+      { id:5, title:'Expense Reporting Guide', desc:'Clarifying receipt requirements, approval thresholds, and submission timeline', priority:'medium', questions:10, conf:72, assignee:'Lisa T.', tags:['Finance'] },
+    ],
+    in_review: [
+      { id:6, title:'Onboarding Checklist', desc:'Updated day-1 through week-4 procedures for new employee integration', priority:'medium', questions:7, conf:74, assignee:'Mike D.', tags:['HR'] },
+      { id:7, title:'Software Request Process', desc:'New workflow for requesting and approving software licenses', priority:'low', questions:5, conf:80, assignee:'Alex R.', tags:['IT'] },
+    ],
+    done: [
+      { id:8, title:'Office Access Policy', desc:'Updated badge, visitor access, and security procedures', priority:'low', questions:4, conf:89, assignee:'Sarah M.', tags:['Facilities'] },
+      { id:9, title:'Health Benefits Guide', desc:'Updated enrollment windows, claims process, and coverage details', priority:'medium', questions:9, conf:85, assignee:'Lisa T.', tags:['HR'] },
+    ]
+  }
+};
+
+const ANSWERS = {
+  work: { text: 'Standard working hours are 9:00 AM to 5:00 PM, Monday through Friday. Core hours (when everyone must be available) are 10 AM–3 PM. Remote work is available 2 days per week with manager approval. Lunch break is 1 hour with flexible timing.', conf: 91, sources: ['Employee Handbook — §2 Working Hours', 'Remote Work Policy — §1.2 Schedule'] },
+  vacat: { text: 'Employees receive 20 days of annual leave per year, accrued at 1.67 days per month. Leave must be requested at least 2 weeks in advance. A maximum of 5 days may be carried over to the next year. Submit requests through the HR portal — manager approval required.', conf: 88, sources: ['Employee Handbook — §4 Leave Policy', 'HR Portal Guide — Leave Requests'] },
+  expens: { text: 'Expense reimbursement covers: client meals ($50/person limit), travel (economy class flights, hotels up to $200/night), and professional development ($2,000/year). Submit expense reports within 30 days with receipts attached. Manager approval is required and reimbursement is processed within 2 weeks.', conf: 86, sources: ['Expense Policy — §3 Eligible Expenses', 'Finance Guidelines — Reimbursements'] },
+  secur: { text: 'To report a security incident: (1) Immediately email security@company.com or call the hotline at (555) 123-4571. For critical incidents, use the 24/7 emergency line. (2) Do not attempt to fix the issue yourself. (3) Preserve evidence — take screenshots if safe. Critical incidents receive an immediate response.', conf: 79, sources: ['IT Security Policy — §8 Incident Reporting', 'Incident Response Playbook'] },
+  remot: { text: 'Remote work is available up to 2 days per week. Requirements: company VPN must be active, core hours (10 AM–3 PM) must be observed, a secure home network (WPA3) is required, and only company-approved devices may be used. Requests need manager approval at least 1 week in advance.', conf: 63, sources: ['Employee Handbook — Remote Work §3', 'IT Security Policy — §4 Network'] },
+  paren: { text: 'The company provides 16 weeks of paid maternity leave and 4 weeks of paid paternity leave. Leave can be taken flexibly within the first year after birth or adoption. Notify HR at least 8 weeks in advance to arrange coverage. Benefits and salary continue in full during parental leave.', conf: 82, sources: ['Employee Handbook — §4.3 Parental Leave', 'HR Benefits Guide — §2'] },
+  default: { text: 'I found some partial information in the documentation, but coverage for this specific topic appears incomplete. The documentation may need to be updated to address this question more comprehensively. I recommend contacting your HR or IT department directly for a definitive answer.', conf: 46, sources: ['General Documentation (partial match)'] }
+};
+
+// ===== NAV =====
+function showView(v) {
+  ['query','dashboard','analytics','documents'].forEach(x => {
+    document.getElementById('view-'+x).classList.add('hidden');
+    document.getElementById('nav-'+x).classList.remove('active');
+  });
+  document.getElementById('view-'+v).classList.remove('hidden');
+  document.getElementById('nav-'+v).classList.add('active');
+  if(v==='analytics') setTimeout(initCharts,100);
+  if(v==='dashboard') renderKanban();
+  if(v==='documents') renderDocs();
+}
+
+// ===== QUERY =====
+function setQ(q){ document.getElementById('questionInput').value = q; }
+
+function askQuestion() {
+  const q = document.getElementById('questionInput').value.trim();
+  if(!q){ showToast('Please type a question first!','⚠️'); return; }
+  const box = document.getElementById('answerBox');
+  box.classList.remove('hidden');
+  document.getElementById('loadingState').classList.remove('hidden');
+  document.getElementById('answerContent').classList.add('hidden');
+  document.getElementById('askBtn').disabled = true;
+  document.getElementById('askBtn').textContent = '⏳ Thinking...';
+
+  setTimeout(() => {
+    document.getElementById('loadingState').classList.add('hidden');
+    const ac = document.getElementById('answerContent');
+    ac.classList.remove('hidden');
+
+    const ql = q.toLowerCase();
+    const key = ql.includes('hour')||ql.includes('work') ? 'work'
+      : ql.includes('vacat')||ql.includes('leave')||ql.includes('day') ? 'vacat'
+      : ql.includes('expens')||ql.includes('reimb') ? 'expens'
+      : ql.includes('secur')||ql.includes('incident') ? 'secur'
+      : ql.includes('remot') ? 'remot'
+      : ql.includes('parent')||ql.includes('matern')||ql.includes('patern') ? 'paren'
+      : 'default';
+
+    const ans = ANSWERS[key];
+    document.getElementById('answerText').textContent = ans.text;
+    const c = ans.conf;
+    document.getElementById('confPercent').textContent = c+'%';
+    const bar = document.getElementById('confBar');
+    const badge = document.getElementById('confidenceBadge');
+    setTimeout(()=>{ bar.style.width=c+'%'; },100);
+
+    if(c>=70){ bar.className='h-full rounded-full confidence-bar bg-green-500'; badge.className='px-3 py-1.5 rounded-full text-sm font-bold bg-green-100 text-green-700'; badge.textContent='✅ '+c+'% Confident'; document.getElementById('lowConfWarn').classList.add('hidden'); }
+    else if(c>=50){ bar.className='h-full rounded-full confidence-bar bg-yellow-400'; badge.className='px-3 py-1.5 rounded-full text-sm font-bold bg-yellow-100 text-yellow-700'; badge.textContent='⚡ '+c+'% Moderate'; document.getElementById('lowConfWarn').classList.remove('hidden'); }
+    else{ bar.className='h-full rounded-full confidence-bar bg-red-500'; badge.className='px-3 py-1.5 rounded-full text-sm font-bold bg-red-100 text-red-700'; badge.textContent='⚠️ '+c+'% Low'; document.getElementById('lowConfWarn').classList.remove('hidden'); }
+
+    document.getElementById('sourcesList').innerHTML = ans.sources.map(s=>`<div class="flex items-center gap-2 p-2.5 bg-gray-50 rounded-lg"><span class="text-gray-400">📄</span><span class="text-xs text-gray-600">${s}</span></div>`).join('');
+
+    S.queries.unshift({ q: q.length>50?q.substring(0,50)+'...':q, conf:c, time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) });
+    S.sessionQ++; S.totalConf+=c; if(c<70) S.lowConf++;
+    renderRecent(); updateStats();
+    document.getElementById('askBtn').disabled = false;
+    document.getElementById('askBtn').textContent = '⚡ Ask AI';
+    showToast(c<70?'Low confidence detected — SOP card auto-created!':'Answer generated successfully!', c<70?'⚠️':'✅');
+  }, 2000);
+}
+
+function renderRecent(){
+  const el = document.getElementById('recentList');
+  if(!S.queries.length){ el.innerHTML='<p class="text-xs text-gray-400 text-center py-4">No queries yet</p>'; return; }
+  el.innerHTML = S.queries.slice(0,5).map(q=>`<div class="flex items-start gap-2 p-2.5 bg-gray-50 rounded-lg">
+    <div class="w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${q.conf>=70?'bg-green-400':q.conf>=50?'bg-yellow-400':'bg-red-400'}"></div>
+    <div class="min-w-0 flex-1">
+      <p class="text-xs text-gray-700 truncate">${q.q}</p>
+      <div class="flex justify-between mt-0.5">
+        <span class="text-xs font-semibold ${q.conf>=70?'text-green-600':q.conf>=50?'text-yellow-600':'text-red-600'}">${q.conf}%</span>
+        <span class="text-xs text-gray-400">${q.time}</span>
+      </div>
+    </div></div>`).join('');
+}
+
+function updateStats(){
+  document.getElementById('statQ').textContent=S.sessionQ;
+  document.getElementById('statC').textContent=S.sessionQ?(S.totalConf/S.sessionQ).toFixed(1)+'%':'—';
+  document.getElementById('statL').textContent=S.lowConf;
+}
+
+// ===== KANBAN =====
+const COL = {
+  to_update:{ label:'🔴 To Update', border:'border-red-200', bg:'bg-red-50' },
+  in_progress:{ label:'🟡 In Progress', border:'border-amber-200', bg:'bg-amber-50' },
+  in_review:{ label:'🔵 In Review', border:'border-blue-200', bg:'bg-blue-50' },
+  done:{ label:'🟢 Done', border:'border-green-200', bg:'bg-green-50' }
+};
+let dragging=null;
+
+function renderKanban(){
+  document.getElementById('kanban-board').innerHTML = Object.entries(COL).map(([k,c])=>`
+    <div class="${c.bg} ${c.border} border-2 rounded-2xl p-4 column-drop" id="col-${k}"
+      ondragover="event.preventDefault();document.getElementById('col-${k}').classList.add('drag-over')"
+      ondragleave="document.getElementById('col-${k}').classList.remove('drag-over')"
+      ondrop="dropCard(event,'${k}')">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="font-semibold text-gray-800 text-sm">${c.label}</h3>
+        <span class="bg-white text-gray-600 text-xs font-bold px-2.5 py-1 rounded-full shadow-sm">${S.kanban[k].length}</span>
+      </div>
+      <div class="space-y-3 min-h-[180px]">${S.kanban[k].map(card=>renderCard(card,k)).join('')}</div>
+    </div>`).join('');
+}
+
+function renderCard(card, col){
+  const pc = card.priority==='high'?'bg-red-100 text-red-700':'card.priority==="medium"?bg-amber-100 text-amber-700':'bg-gray-100 text-gray-600';
+  const pLabel = card.priority.toUpperCase();
+  const pStyle = card.priority==='high'?'background:#fee2e2;color:#b91c1c':card.priority==='medium'?'background:#fef3c7;color:#b45309':'background:#f3f4f6;color:#4b5563';
+  const cColor = card.conf>=70?'#16a34a':card.conf>=50?'#d97706':'#dc2626';
+  const cBg = card.conf>=70?'#4ade80':card.conf>=50?'#fbbf24':'#f87171';
+  return `<div class="bg-white rounded-xl p-4 shadow-sm drag-card" draggable="true"
+    ondragstart="startDrag(event,${card.id},'${col}')" ondragend="endDrag()">
+    <div class="flex justify-between items-start mb-2">
+      <span style="${pStyle};padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700">${pLabel}</span>
+      ${card.conf<70?'<span title="Low confidence">⚠️</span>':''}
+    </div>
+    <h4 class="font-semibold text-gray-900 text-sm mb-1 leading-snug">${card.title}</h4>
+    <p class="text-xs text-gray-500 mb-3 leading-relaxed" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${card.desc}</p>
+    <div class="space-y-1 mb-3">
+      <div class="flex justify-between text-xs"><span class="text-gray-400">💬 ${card.questions} questions</span><span style="color:${cColor};font-weight:700">${card.conf}%</span></div>
+      <div class="bg-gray-100 rounded-full h-1.5 overflow-hidden"><div class="h-full rounded-full" style="width:${card.conf}%;background:${cBg};transition:width 0.5s"></div></div>
+    </div>
+    <div class="flex justify-between items-center pt-2 border-t border-gray-50">
+      <div class="flex gap-1">${card.tags.map(t=>`<span class="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">${t}</span>`).join('')}</div>
+      <span class="text-xs text-gray-400">👤 ${card.assignee}</span>
+    </div>
+  </div>`;
+}
+
+function startDrag(e,id,col){ dragging={id,col}; e.dataTransfer.effectAllowed='move'; setTimeout(()=>{const el=document.getElementById('card-'+id); if(el)el.style.opacity='0.4';},0); }
+function endDrag(){ if(dragging){const el=document.getElementById('card-'+dragging.id);if(el)el.style.opacity='1';} document.querySelectorAll('.column-drop').forEach(c=>c.classList.remove('drag-over')); dragging=null; }
+function dropCard(e,target){
+  e.preventDefault(); document.getElementById('col-'+target).classList.remove('drag-over');
+  if(!dragging||dragging.col===target) return;
+  const {id,col}=dragging;
+  const idx=S.kanban[col].findIndex(c=>c.id===id);
+  if(idx===-1) return;
+  const card=S.kanban[col].splice(idx,1)[0];
+  S.kanban[target].push(card);
+  renderKanban();
+  showToast(`"${card.title}" moved to ${COL[target].label}`,'📋');
+}
+function addNewCard(){
+  const t=prompt('Enter SOP title:','New SOP Update');
+  if(!t) return;
+  S.kanban.to_update.unshift({id:Date.now(),title:t,desc:'Manually created SOP update item',priority:'medium',questions:0,conf:75,assignee:'Unassigned',tags:['New']});
+  renderKanban(); showToast('New SOP card added!','✅');
+}
+
+// ===== ANALYTICS =====
+let chartsInited=false;
+function initCharts(){
+  if(chartsInited) return; chartsInited=true;
+  const weeks=['Wk1','Wk2','Wk3','Wk4','Wk5','Wk6','Wk7','Wk8'];
+  new Chart(document.getElementById('queryChart'),{
+    type:'bar', data:{ labels:weeks, datasets:[{label:'Queries',data:[98,145,132,178,201,185,220,245],backgroundColor:'rgba(102,126,234,0.75)',borderRadius:8,borderSkipped:false}] },
+    options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'#f5f5f5'}},x:{grid:{display:false}}}}
+  });
+  new Chart(document.getElementById('confChart'),{
+    type:'line', data:{ labels:weeks, datasets:[{label:'Confidence %',data:[68,71,69,74,76,78,75,79],borderColor:'#10b981',backgroundColor:'rgba(16,185,129,0.08)',fill:true,tension:0.4,pointBackgroundColor:'#10b981',pointRadius:5}] },
+    options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{min:50,max:100,grid:{color:'#f5f5f5'}},x:{grid:{display:false}}}}
+  });
+  const clusters=[
+    {topic:'Leave & Vacation Policy',q:32,conf:61,p:'high'},
+    {topic:'Remote Work Setup',q:28,conf:58,p:'high'},
+    {topic:'IT Security Incidents',q:24,conf:71,p:'medium'},
+    {topic:'Expense Reimbursements',q:19,conf:68,p:'medium'},
+    {topic:'Onboarding Process',q:15,conf:77,p:'low'},
+    {topic:'Performance Reviews',q:12,conf:73,p:'low'},
+  ];
+  document.getElementById('clusterTable').innerHTML = clusters.map(c=>`<tr class="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+    <td class="py-3 px-3 font-medium text-gray-800 text-sm">${c.topic}</td>
+    <td class="py-3 px-3"><span class="bg-blue-50 text-blue-700 font-bold text-xs px-2.5 py-1 rounded-full">${c.q}</span></td>
+    <td class="py-3 px-3"><div class="flex items-center gap-2"><div class="w-16 bg-gray-100 rounded-full h-2"><div class="h-full rounded-full ${c.conf>=70?'bg-green-400':'bg-red-400'}" style="width:${c.conf}%"></div></div><span class="text-xs font-bold ${c.conf>=70?'text-green-600':'text-red-600'}">${c.conf}%</span></div></td>
+    <td class="py-3 px-3"><span style="${c.p==='high'?'background:#fee2e2;color:#b91c1c':c.p==='medium'?'background:#fef3c7;color:#b45309':'background:#f3f4f6;color:#4b5563'};padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700">${c.p.toUpperCase()}</span></td>
+    <td class="py-3 px-3"><button onclick="showToast('SOP card created for: ${c.topic}','✅')" class="text-xs text-purple-600 hover:text-purple-800 font-semibold">Create SOP →</button></td>
+  </tr>`).join('');
+}
+
+// ===== DOCUMENTS =====
+function renderDocs(){
+  document.getElementById('docCount').textContent='('+S.docs.length+')';
+  document.getElementById('totalDocs').textContent=S.docs.length;
+  document.getElementById('docList').innerHTML = S.docs.map(d=>`<div class="flex items-center gap-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors group">
+    <div class="w-10 h-10 ${d.type==='pdf'?'bg-red-100':'bg-blue-100'} rounded-xl flex items-center justify-center flex-shrink-0 text-xl">${d.type==='pdf'?'📕':'📝'}</div>
+    <div class="flex-1 min-w-0">
+      <p class="font-semibold text-gray-900 text-sm truncate">${d.name}</p>
+      <p class="text-xs text-gray-400 mt-0.5">${d.size} • ${d.pages} pages • ${d.chunks} chunks • ${d.date}</p>
+      <div class="flex items-center gap-2 mt-1.5">
+        <div class="w-20 bg-gray-200 rounded-full h-1.5"><div class="h-full rounded-full ${d.conf>=80?'bg-green-400':'bg-yellow-400'}" style="width:${d.conf}%"></div></div>
+        <span class="text-xs font-semibold ${d.conf>=80?'text-green-600':'text-yellow-600'}">${d.conf}% quality</span>
+      </div>
+    </div>
+    <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+      <button onclick="showToast('\"${d.name}\" re-indexed!','🔄')" class="text-xs bg-blue-50 text-blue-600 px-2.5 py-1.5 rounded-lg hover:bg-blue-100 font-medium">Re-index</button>
+      <button onclick="deleteDoc(${d.id})" class="text-xs bg-red-50 text-red-600 px-2.5 py-1.5 rounded-lg hover:bg-red-100 font-medium">Delete</button>
+    </div>
+  </div>`).join('');
+}
+function handleDrop(e){ e.preventDefault(); const f=e.dataTransfer.files[0]; if(f) processUpload(f); }
+function handleFileUpload(e){ if(e.target.files[0]) processUpload(e.target.files[0]); }
+function processUpload(f){
+  if(!f.name.match(/\.(pdf|md)$/i)){ showToast('Only PDF and Markdown files!','⚠️'); return; }
+  showToast('Processing "'+f.name+'"...','⚙️');
+  setTimeout(()=>{
+    S.docs.unshift({id:Date.now(),name:f.name,type:f.name.endsWith('.pdf')?'pdf':'md',size:(f.size/1024/1024).toFixed(1)+' MB',pages:Math.floor(Math.random()*30+5),chunks:Math.floor(Math.random()*200+50),date:new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),conf:Math.floor(Math.random()*20+70)});
+    renderDocs(); showToast('"'+f.name+'" uploaded & indexed!','✅');
+  },1500);
+}
+function deleteDoc(id){ if(!confirm('Delete this document?')) return; S.docs=S.docs.filter(d=>d.id!==id); renderDocs(); showToast('Document deleted','🗑️'); }
+
+// ===== TOAST =====
+function showToast(msg,icon='✅'){
+  document.getElementById('toastMsg').textContent=msg;
+  document.getElementById('toastIcon').textContent=icon;
+  const t=document.getElementById('toast');
+  t.classList.remove('hidden');
+  setTimeout(()=>t.classList.add('hidden'),3500);
+}
+</script>
+</body>
+</html>
